@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>製造DXビジョン：課題 × ツール マッピング</title>
+    <style>
+        :root {
+            --color-primary: #1a1a2e;
+            --color-secondary: #16213e;
+            --color-accent: #0f3460;
+            --color-highlight: #e94560;
+            --color-covered: #00b894;
+            --color-partial: #fdcb6e;
+            --color-uncovered: #636e72;
+            --color-uncovered-bg: #2d3436;
+            --color-text: #dfe6e9;
+            --color-text-muted: #b2bec3;
+            --color-border: #2d3436;
+            --color-card-bg: #1e272e;
+            --color-hover: #2d3436;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
+            background: var(--color-primary);
+            color: var(--color-text);
+            line-height: 1.6;
+            padding: 24px;
+        }
+        .header {
+            text-align: center; margin-bottom: 32px; padding: 24px;
+            background: linear-gradient(135deg, var(--color-secondary), var(--color-accent));
+            border-radius: 12px;
+        }
+        .header h1 { font-size: 1.8rem; margin-bottom: 8px; }
+        .header .vision-statement {
+            font-size: 1.1rem; color: var(--color-text-muted);
+            max-width: 700px; margin: 0 auto;
+        }
+        .tabs {
+            display: flex; gap: 4px; margin-bottom: 24px;
+            border-bottom: 2px solid var(--color-border);
+        }
+        .tab {
+            padding: 12px 24px; cursor: pointer; border: none;
+            background: transparent; color: var(--color-text-muted);
+            font-size: 0.95rem; font-weight: 600;
+            border-bottom: 3px solid transparent; transition: all 0.2s;
+        }
+        .tab:hover { color: var(--color-text); background: var(--color-hover); }
+        .tab.active { color: var(--color-highlight); border-bottom-color: var(--color-highlight); }
+        .view { display: none; }
+        .view.active { display: block; }
+        .domain-card {
+            background: var(--color-card-bg); border-radius: 12px;
+            padding: 20px; margin-bottom: 16px;
+            border-left: 4px solid var(--color-uncovered); transition: transform 0.2s;
+        }
+        .domain-card:hover { transform: translateX(4px); }
+        .domain-card.coverage-high { border-left-color: var(--color-covered); }
+        .domain-card.coverage-mid { border-left-color: var(--color-partial); }
+        .domain-card.coverage-low { border-left-color: var(--color-highlight); }
+        .domain-card.coverage-zero { border-left-color: #d63031; }
+        .domain-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px; cursor: pointer;
+        }
+        .domain-title { font-size: 1.1rem; font-weight: 700; }
+        .coverage-badge { display: flex; align-items: center; gap: 8px; }
+        .coverage-bar {
+            width: 120px; height: 8px; background: var(--color-uncovered-bg);
+            border-radius: 4px; overflow: hidden;
+        }
+        .coverage-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+        .coverage-fill.high { background: var(--color-covered); }
+        .coverage-fill.mid { background: var(--color-partial); }
+        .coverage-fill.low { background: var(--color-highlight); }
+        .coverage-fill.zero { background: #d63031; }
+        .coverage-pct { font-size: 0.85rem; font-weight: 700; min-width: 36px; text-align: right; }
+        .challenge-list { display: none; }
+        .domain-card.expanded .challenge-list { display: block; }
+        .challenge-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; margin: 4px 0; border-radius: 6px;
+            font-size: 0.9rem; transition: background 0.2s;
+        }
+        .challenge-item:hover { background: var(--color-hover); }
+        .challenge-item.covered { border-left: 3px solid var(--color-covered); }
+        .challenge-item.partial { border-left: 3px solid var(--color-partial); }
+        .challenge-item.uncovered { border-left: 3px solid var(--color-uncovered); opacity: 0.7; }
+        .challenge-tools { display: flex; gap: 4px; flex-wrap: wrap; }
+        .tool-tag {
+            padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
+        }
+        .tool-tag.direct {
+            background: rgba(0, 184, 148, 0.2); color: var(--color-covered);
+            border: 1px solid rgba(0, 184, 148, 0.3);
+        }
+        .tool-tag.partial-tag {
+            background: rgba(253, 203, 110, 0.2); color: var(--color-partial);
+            border: 1px solid rgba(253, 203, 110, 0.3);
+        }
+        .uncovered-label { color: var(--color-uncovered); font-size: 0.8rem; font-style: italic; }
+        .expand-icon {
+            transition: transform 0.2s; font-size: 0.8rem; color: var(--color-text-muted);
+        }
+        .domain-card.expanded .expand-icon { transform: rotate(90deg); }
+        .tool-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px;
+        }
+        .tool-card {
+            background: var(--color-card-bg); border-radius: 12px;
+            padding: 20px; border-top: 3px solid var(--color-accent);
+        }
+        .tool-card-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+        }
+        .tool-name { font-size: 1.05rem; font-weight: 700; }
+        .tool-letter {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: var(--color-accent); display: flex;
+            align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.9rem;
+        }
+        .tool-challenge {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 0; font-size: 0.88rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .tool-challenge:last-child { border-bottom: none; }
+        .tool-challenge .dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+        }
+        .dot.direct { background: var(--color-covered); }
+        .dot.partial { background: var(--color-partial); }
+        .tool-challenge .domain-label {
+            color: var(--color-text-muted); font-size: 0.75rem;
+            margin-left: auto; white-space: nowrap;
+        }
+        .gap-section { margin-bottom: 32px; }
+        .gap-section h3 {
+            margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border);
+        }
+        .gap-card {
+            background: var(--color-card-bg); border-radius: 12px;
+            padding: 20px; margin-bottom: 12px;
+        }
+        .gap-card.critical { border-left: 4px solid #d63031; }
+        .gap-card.warning { border-left: 4px solid var(--color-partial); }
+        .gap-items { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .gap-item {
+            padding: 6px 12px; background: var(--color-uncovered-bg);
+            border-radius: 6px; font-size: 0.85rem;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .stats-row {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px; margin-bottom: 32px;
+        }
+        .stat-card {
+            background: var(--color-card-bg); border-radius: 12px;
+            padding: 16px; text-align: center;
+        }
+        .stat-value { font-size: 2rem; font-weight: 700; }
+        .stat-value.good { color: var(--color-covered); }
+        .stat-value.warn { color: var(--color-partial); }
+        .stat-value.bad { color: var(--color-highlight); }
+        .stat-label { font-size: 0.8rem; color: var(--color-text-muted); margin-top: 4px; }
+        .footer {
+            text-align: center; margin-top: 40px; padding: 16px;
+            color: var(--color-text-muted); font-size: 0.8rem;
+        }
+        .gap-header {
+            display: flex; justify-content: space-between; align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>製造DXビジョン：課題 × ツール マッピング</h1>
+    <p class="vision-statement">生産ラインのあらゆるロスを排除し、売上・利益を最大化する。<br>データを正しくためる仕組みと、ためたデータを自動で活用する仕組みを作る。</p>
+</div>
+
+<div class="stats-row" id="stats"></div>
+
+<div class="tabs">
+    <button class="tab active" data-view="coverage">領域別カバレッジ</button>
+    <button class="tab" data-view="tools">ツール中心マップ</button>
+    <button class="tab" data-view="gaps">空白地帯分析</button>
+</div>
+
+<div id="coverage" class="view active"></div>
+<div id="tools" class="view"></div>
+<div id="gaps" class="view"></div>
+
+<div class="footer">最終更新：2026-02-24</div>
+
+<script>
+"use strict";
+
+const data = {
+    domains: [
+        {
+            id: 1, name: "リアルタイム生産監視",
+            challenges: [
+                { id: "1-1", name: "サイクルタイム延伸の検知", tools: [{ name: "VSMダッシュボード", letter: "E", type: "direct" }] },
+                { id: "1-2", name: "ボトルネック工程の特定", tools: [{ name: "VSMダッシュボード", letter: "E", type: "direct" }] },
+                { id: "1-3", name: "停止原因の自動判別（トラブル/段替え）", tools: [] },
+                { id: "1-4", name: "段替え時間の工程別正確計測", tools: [] },
+                { id: "1-5", name: "トラブル時間の正確計測", tools: [{ name: "VSMダッシュボード", letter: "E", type: "partial" }] }
+            ]
+        },
+        {
+            id: 2, name: "トラブル分析・変化点管理",
+            challenges: [
+                { id: "2-1", name: "トラブル傾向分析（時間帯・機種別）", tools: [{ name: "Text-to-SQL", letter: "C", type: "partial" }] },
+                { id: "2-2", name: "4M変化と品質変化の時間軸マッチング", tools: [] },
+                { id: "2-3", name: "「いつもと違う」の自動検知", tools: [] },
+                { id: "2-4", name: "直近の変化の即座把握", tools: [] },
+                { id: "2-5", name: "トラブル対応の迅速化（ナレッジ活用）", tools: [{ name: "製造特化型RAG", letter: "A", type: "direct" }, { name: "メンテ履歴", letter: "B", type: "partial" }] },
+                { id: "2-6", name: "複数人での原因追求の場", tools: [] }
+            ]
+        },
+        {
+            id: 3, name: "品質管理・予兆保全",
+            challenges: [
+                { id: "3-1", name: "品質兆候検知・ドカ停防止", tools: [] },
+                { id: "3-2", name: "品質急変の原因特定", tools: [] },
+                { id: "3-3", name: "部品ロット問題のトレーサビリティ", tools: [{ name: "トレサビ検索", letter: "H", type: "direct" }] }
+            ]
+        },
+        {
+            id: 4, name: "ナレッジ管理・自動文書化",
+            challenges: [
+                { id: "4-1", name: "トラブル対応ナレッジの蓄積", tools: [{ name: "製造特化型RAG", letter: "A", type: "direct" }, { name: "メンテ履歴", letter: "B", type: "partial" }] },
+                { id: "4-2", name: "生産日報の自動化", tools: [] },
+                { id: "4-3", name: "管理者向け帳票の自動作成", tools: [] },
+                { id: "4-4", name: "手順書の適切なタイミングでの更新", tools: [] }
+            ]
+        },
+        {
+            id: 5, name: "設備・保全管理",
+            challenges: [
+                { id: "5-1", name: "メンテナンス履歴の詳細管理", tools: [{ name: "メンテ履歴", letter: "B", type: "direct" }] },
+                { id: "5-2", name: "メンテナンス効果の自動評価（前後比較）", tools: [{ name: "メンテ履歴", letter: "B", type: "partial" }] },
+                { id: "5-3", name: "設備に図面・ドキュメントを紐付け", tools: [{ name: "ドキュメント管理", letter: "F", type: "direct" }, { name: "製造特化型RAG", letter: "A", type: "partial" }] },
+                { id: "5-4", name: "生産中機種の図面に即アクセス", tools: [{ name: "ドキュメント管理", letter: "F", type: "direct" }, { name: "製造特化型RAG", letter: "A", type: "direct" }] },
+                { id: "5-5", name: "購入品の購入依頼", tools: [{ name: "ドキュメント管理", letter: "F", type: "partial" }] },
+                { id: "5-6", name: "交換予測・適正在庫管理", tools: [{ name: "ドキュメント管理", letter: "F", type: "partial" }] },
+                { id: "5-7", name: "メンテナンス入力時トラブル情報自動読出", tools: [{ name: "メンテ履歴", letter: "B", type: "direct" }] }
+            ]
+        },
+        {
+            id: 6, name: "物流・生産計画の最適化",
+            challenges: [
+                { id: "6-1", name: "部品ロット問題時の生産計画動的変更", tools: [] },
+                { id: "6-2", name: "部品予備在庫の即時確認", tools: [] },
+                { id: "6-3", name: "生産機種変更の優先順位判断", tools: [] },
+                { id: "6-4", name: "段替え準備警告", tools: [] },
+                { id: "6-5", name: "AMRによる搬送自動化", tools: [] }
+            ]
+        },
+        {
+            id: 7, name: "マネジメント可視化",
+            challenges: [
+                { id: "7-1", name: "生産ラインの収益性把握", tools: [] },
+                { id: "7-2", name: "トラブル・メンテナンスの優先順位", tools: [] },
+                { id: "7-3", name: "計画停止の最適化", tools: [] },
+                { id: "7-4", name: "VSMでもの・情報の流れを可視化", tools: [{ name: "VSMダッシュボード", letter: "E", type: "direct" }] },
+                { id: "7-5", name: "仕掛品の適正量把握", tools: [{ name: "VSMダッシュボード", letter: "E", type: "direct" }] },
+                { id: "7-6", name: "トラブル経過時間の可視化", tools: [{ name: "VSMダッシュボード", letter: "E", type: "direct" }] },
+                { id: "7-7", name: "直行率・稼働率の把握", tools: [{ name: "VSMダッシュボード", letter: "E", type: "direct" }] }
+            ]
+        },
+        {
+            id: 8, name: "DX推進チーム運営",
+            challenges: [
+                { id: "8-1", name: "開発ノウハウ・失敗談の発信", tools: [{ name: "タスク管理", letter: "I", type: "partial" }] },
+                { id: "8-2", name: "開発タスクのスケジューリング管理", tools: [{ name: "タスク管理", letter: "I", type: "direct" }] },
+                { id: "8-3", name: "情報共有・ナレッジ蓄積の仕組み", tools: [{ name: "タスク管理", letter: "I", type: "partial" }] }
+            ]
+        },
+        {
+            id: 9, name: "生産技術業務のDX",
+            challenges: [
+                { id: "9-1", name: "PFMEA自動作成", tools: [] },
+                { id: "9-2", name: "トラブル・メンテ実績のPFMEA自動反映", tools: [{ name: "メンテ履歴", letter: "B", type: "partial" }] }
+            ]
+        },
+        {
+            id: 0, name: "領域横断の共通課題",
+            challenges: [
+                { id: "X-1", name: "データアクセシビリティ", tools: [{ name: "製造特化型RAG", letter: "A", type: "direct" }, { name: "Text-to-SQL", letter: "C", type: "direct" }] },
+                { id: "X-2", name: "スキルマップ管理", tools: [] }
+            ]
+        }
+    ],
+    tools: [
+        { letter: "A", name: "製造特化型RAG", desc: "仕様書・図面・トラブル記録の高度検索" },
+        { letter: "B", name: "設備メンテナンス履歴デジタル化", desc: "自然言語入力、品質相関分析、PFMEA自動還元" },
+        { letter: "C", name: "Text-to-SQL", desc: "自然言語でデータ抽出" },
+        { letter: "D", name: "Raspberry Pi IoTデータ収集", desc: "非ネットワーク設備のデータをクラウドへ" },
+        { letter: "E", name: "VSMダッシュボード", desc: "仕掛品・直行率・トラブル情報のリアルタイム可視化" },
+        { letter: "F", name: "設備ドキュメント管理", desc: "図面・マニュアル・購入品のバージョン管理" },
+        { letter: "G", name: "汎用型ETLツール", desc: "多様なファイル形式をクラウドへ統一取込" },
+        { letter: "H", name: "トレサビ検索アプリ", desc: "ロット→製品、製品→部品ロット・経路追跡" },
+        { letter: "I", name: "AIチャット型タスク管理", desc: "タスク管理、日報・週報の自動生成" }
+    ]
+};
+
+// Helper: create element with class/text
+function el(tag, classNames, textContent) {
+    const elem = document.createElement(tag);
+    if (classNames) {
+        classNames.split(" ").forEach(c => { if (c) elem.classList.add(c); });
+    }
+    if (textContent !== undefined) elem.textContent = textContent;
+    return elem;
+}
+
+function getCoverageClass(pct) {
+    if (pct >= 60) return "high";
+    if (pct >= 40) return "mid";
+    if (pct > 0) return "low";
+    return "zero";
+}
+
+function getCoverageColor(cls) {
+    const map = { high: "var(--color-covered)", mid: "var(--color-partial)", low: "var(--color-highlight)", zero: "#d63031" };
+    return map[cls] || "var(--color-text-muted)";
+}
+
+function calcCoverage(challenges) {
+    const covered = challenges.filter(c => c.tools.length > 0).length;
+    return Math.round((covered / challenges.length) * 100);
+}
+
+// Stats
+function renderStats() {
+    const container = document.getElementById("stats");
+    const allChallenges = data.domains.flatMap(d => d.challenges);
+    const total = allChallenges.length;
+    const covered = allChallenges.filter(c => c.tools.some(t => t.type === "direct")).length;
+    const partial = allChallenges.filter(c => !c.tools.some(t => t.type === "direct") && c.tools.some(t => t.type === "partial")).length;
+    const uncovered = total - covered - partial;
+    const overallPct = Math.round(((covered + partial * 0.5) / total) * 100);
+
+    const statData = [
+        { value: total, cls: "", label: "課題 合計" },
+        { value: covered, cls: "good", label: "カバー済み" },
+        { value: partial, cls: "warn", label: "一部カバー" },
+        { value: uncovered, cls: "bad", label: "未カバー" },
+        { value: data.tools.length, cls: "", label: "既存ツール" },
+        { value: overallPct + "%", cls: getCoverageClass(overallPct), label: "総合カバー率" }
+    ];
+
+    statData.forEach(s => {
+        const card = el("div", "stat-card");
+        const valClass = "stat-value" + (s.cls ? " " + s.cls : "");
+        card.appendChild(el("div", valClass, String(s.value)));
+        card.appendChild(el("div", "stat-label", s.label));
+        container.appendChild(card);
+    });
+}
+
+// View 1: Coverage Map
+function renderCoverage() {
+    const container = document.getElementById("coverage");
+
+    data.domains.forEach(domain => {
+        const pct = calcCoverage(domain.challenges);
+        const cls = getCoverageClass(pct);
+
+        const card = el("div", "domain-card coverage-" + cls + " expanded");
+        card.dataset.domain = domain.id;
+
+        // Header
+        const header = el("div", "domain-header");
+        header.addEventListener("click", () => card.classList.toggle("expanded"));
+
+        const left = el("div", null);
+        left.style.display = "flex";
+        left.style.alignItems = "center";
+        left.style.gap = "12px";
+        left.appendChild(el("span", "expand-icon", "\u25B6"));
+        const prefix = domain.id === 0 ? "" : domain.id + ". ";
+        left.appendChild(el("span", "domain-title", prefix + domain.name));
+        header.appendChild(left);
+
+        const badge = el("div", "coverage-badge");
+        const bar = el("div", "coverage-bar");
+        const fill = el("div", "coverage-fill " + cls);
+        fill.style.width = pct + "%";
+        bar.appendChild(fill);
+        badge.appendChild(bar);
+        const pctEl = el("span", "coverage-pct", pct + "%");
+        pctEl.style.color = getCoverageColor(cls);
+        badge.appendChild(pctEl);
+        header.appendChild(badge);
+        card.appendChild(header);
+
+        // Challenge list
+        const list = el("div", "challenge-list");
+        domain.challenges.forEach(c => {
+            const status = c.tools.some(t => t.type === "direct") ? "covered" : c.tools.length > 0 ? "partial" : "uncovered";
+            const item = el("div", "challenge-item " + status);
+
+            item.appendChild(el("span", null, "[" + c.id + "] " + c.name));
+
+            const toolsDiv = el("div", "challenge-tools");
+            if (c.tools.length > 0) {
+                c.tools.forEach(t => {
+                    const tagCls = t.type === "direct" ? "tool-tag direct" : "tool-tag partial-tag";
+                    toolsDiv.appendChild(el("span", tagCls, t.letter + ":" + t.name));
+                });
+            } else {
+                toolsDiv.appendChild(el("span", "uncovered-label", "未カバー"));
+            }
+            item.appendChild(toolsDiv);
+            list.appendChild(item);
+        });
+        card.appendChild(list);
+        container.appendChild(card);
+    });
+}
+
+// View 2: Tool Map
+function renderTools() {
+    const container = document.getElementById("tools");
+    const grid = el("div", "tool-grid");
+
+    const toolChallenges = {};
+    data.tools.forEach(t => { toolChallenges[t.letter] = []; });
+
+    data.domains.forEach(domain => {
+        domain.challenges.forEach(challenge => {
+            challenge.tools.forEach(tool => {
+                if (toolChallenges[tool.letter]) {
+                    toolChallenges[tool.letter].push({
+                        id: challenge.id,
+                        name: challenge.name,
+                        domainName: domain.name,
+                        linkType: tool.type
+                    });
+                }
+            });
+        });
+    });
+
+    data.tools.forEach(tool => {
+        const card = el("div", "tool-card");
+        const headerDiv = el("div", "tool-card-header");
+
+        const info = el("div", null);
+        info.appendChild(el("div", "tool-name", tool.name));
+        const desc = el("div", null, tool.desc);
+        desc.style.fontSize = "0.8rem";
+        desc.style.color = "var(--color-text-muted)";
+        desc.style.marginTop = "4px";
+        info.appendChild(desc);
+        headerDiv.appendChild(info);
+        headerDiv.appendChild(el("div", "tool-letter", tool.letter));
+        card.appendChild(headerDiv);
+
+        const challenges = toolChallenges[tool.letter];
+        if (challenges.length > 0) {
+            challenges.forEach(c => {
+                const row = el("div", "tool-challenge");
+                row.appendChild(el("span", "dot " + c.linkType));
+                row.appendChild(el("span", null, "[" + c.id + "] " + c.name));
+                const label = el("span", "domain-label", c.domainName);
+                row.appendChild(label);
+                card.appendChild(row);
+            });
+        } else {
+            const row = el("div", "tool-challenge");
+            row.style.color = "var(--color-text-muted)";
+            row.style.fontStyle = "italic";
+            row.appendChild(el("span", "dot partial"));
+            row.appendChild(el("span", null, "基盤ツール（データ収集・変換）"));
+            card.appendChild(row);
+        }
+
+        grid.appendChild(card);
+    });
+
+    container.appendChild(grid);
+}
+
+// View 3: Gap Analysis
+function renderGaps() {
+    const container = document.getElementById("gaps");
+    const critical = [];
+    const warning = [];
+
+    data.domains.forEach(domain => {
+        const pct = calcCoverage(domain.challenges);
+        const uncovered = domain.challenges.filter(c => c.tools.length === 0);
+        if (uncovered.length === 0) return;
+
+        const entry = { domain, uncovered, pct };
+        if (pct <= 33) critical.push(entry);
+        else warning.push(entry);
+    });
+
+    critical.sort((a, b) => a.pct - b.pct);
+    warning.sort((a, b) => a.pct - b.pct);
+
+    function renderSection(title, items, type) {
+        if (items.length === 0) return;
+        const section = el("div", "gap-section");
+        section.appendChild(el("h3", null, title));
+
+        items.forEach(item => {
+            const card = el("div", "gap-card " + type);
+            const headerDiv = el("div", "gap-header");
+            const prefix = item.domain.id === 0 ? "" : item.domain.id + ". ";
+            headerDiv.appendChild(el("strong", null, prefix + item.domain.name));
+            const statusText = "カバー率 " + item.pct + "%（未カバー " + item.uncovered.length + "/" + item.domain.challenges.length + "）";
+            const statusEl = el("span", null, statusText);
+            statusEl.style.color = type === "critical" ? "#d63031" : "var(--color-partial)";
+            statusEl.style.fontWeight = "700";
+            headerDiv.appendChild(statusEl);
+            card.appendChild(headerDiv);
+
+            const itemsDiv = el("div", "gap-items");
+            item.uncovered.forEach(c => {
+                itemsDiv.appendChild(el("div", "gap-item", "[" + c.id + "] " + c.name));
+            });
+            card.appendChild(itemsDiv);
+            section.appendChild(card);
+        });
+
+        container.appendChild(section);
+    }
+
+    renderSection("危険度：高（カバー率33%以下）", critical, "critical");
+    renderSection("危険度：中（カバー率34%以上、空白あり）", warning, "warning");
+}
+
+// Tab switching
+document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+        tab.classList.add("active");
+        document.getElementById(tab.dataset.view).classList.add("active");
+    });
+});
+
+// Initialize
+renderStats();
+renderCoverage();
+renderTools();
+renderGaps();
+</script>
+
+</body>
+</html>
